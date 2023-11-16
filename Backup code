@@ -1,0 +1,248 @@
+Server
+
+
+
+
+const express = require('express');
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const UserModel = require('./models/User');
+
+const app = express();
+const port = 5000;
+
+app.use(cors());
+app.use(express.json());
+
+mongoose.connect("mongodb+srv://angelbelangel:angel@cluster0.zdy2k51.mongodb.net/angeldb");
+
+const secretKey = 'mySecretKey';
+
+// Registration endpoint
+app.post('/users/register', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const existingUser = await UserModel.findOne({ username });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
+    // If the username is unique, proceed with registration
+    const newUser = await UserModel.create({ username, password: await bcrypt.hash(password, 10) });
+    res.status(201).json({ message: 'User registered successfully', newUser });
+  } catch (error) {
+    console.error('Registration failed:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// login endpoint
+app.post('/users/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const user = await UserModel.findOne({ username });
+
+    if (user) {
+      const passwordMatch = await bcrypt.compare(password, user.password);
+
+      if (passwordMatch) {
+        // Passwords match, generate and send a token
+        const token = jwt.sign({ username }, secretKey, { expiresIn: '1d' });
+        res.json({ token });
+      } else {
+        res.status(401).json({ message: 'Invalid username or password' });
+      }
+    } else {
+      res.status(401).json({ message: 'Invalid username or password' });
+    }
+  } catch (error) {
+    console.error('Login failed:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+
+
+
+Registration
+
+import React, { useState } from "react";
+import axios from "axios";
+import { hash } from 'bcryptjs';
+
+function RegistrationForm() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleRegistration = async () => {
+    try {
+      const response = await axios.post(
+        "http://localhost:5000/users/register",
+        {
+          username,
+          password: await hash(password, 10),
+        }
+      );
+
+      console.log(response.data.message);
+
+      // Handle successful registration,
+    } catch (error) {
+      console.error("Registration failed:", error.response.data.message);
+      // Handle registration failure, e.g., show an error message to the user
+    }
+  };
+
+  return (
+    // ... (your registration form JSX remains the same)
+  );
+}
+
+export default RegistrationForm;
+
+
+
+
+Login
+
+import React, { useState } from 'react';
+import axios from 'axios';
+
+function LoginForm({ setIsLogin }: any) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/users/login', {
+        username,
+        password,
+      });
+
+      console.log(response);
+
+      const token = response.data.token;
+
+      // Save the token to local storage
+      localStorage.setItem('token', token);
+      setIsLogin(true);
+      // Redirect to home or handle the login success as needed
+    } catch (error) {
+      console.error('Login failed:', error.response.data.message);
+      // Handle login failure, e.g., show an error message to the user
+    }
+  }
+
+  return (
+    // ... (your login form JSX remains the same)
+  );
+}
+
+export default LoginForm;
+
+
+
+
+
+
+with authorization
+
+
+// Import necessary modules
+const express = require('express');
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const UserModel = require('./models/User');
+
+// Create express app
+const app = express();
+const port = 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+mongoose.connect("mongodb+srv://angelbelangel:angel@cluster0.zdy2k51.mongodb.net/angeldb");
+
+const secretKey = 'mySecretKey';
+
+// Sample middleware to protect routes
+function authenticateToken(req, res, next) {
+  const token = req.headers['authorization'];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Unauthorized - Token not provided' });
+  }
+
+  jwt.verify(token, secretKey, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: 'Forbidden - Invalid token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// Registration endpoint
+app.post('/users/register', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const existingUser = await UserModel.findOne({ username });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
+    const newUser = await UserModel.create({ username, password: await bcrypt.hash(password, 10) });
+    res.status(201).json({ message: 'User registered successfully', newUser });
+  } catch (error) {
+    console.error('Registration failed:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Login endpoint
+app.post('/users/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const user = await UserModel.findOne({ username });
+
+    if (user) {
+      const passwordMatch = await bcrypt.compare(password, user.password);
+
+      if (passwordMatch) {
+        const token = jwt.sign({ username }, secretKey, { expiresIn: '1d' });
+        res.json({ token });
+      } else {
+        res.status(401).json({ message: 'Invalid username or password' });
+      }
+    } else {
+      res.status(401).json({ message: 'Invalid username or password' });
+    }
+  } catch (error) {
+    console.error('Login failed:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Protected route example
+app.get('/home', authenticateToken, (req, res) => {
+  res.json({ message: 'Welcome to the home page!' });
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
